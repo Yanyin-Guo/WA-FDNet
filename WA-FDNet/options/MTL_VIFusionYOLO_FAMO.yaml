@@ -1,0 +1,201 @@
+# general settings
+name: train_MTL_VIYOLO_FAMO
+model_type: MTL_VIYOLO_FAMO
+phase: train
+num_gpu: 1
+manual_seed: 3407
+
+
+hyp: # Data augmentation settings. It's basically consistent with yolo with the deletion of HSV and Albumentations transformations.
+  close_mosaic: 1 #Close mosaic augmentation after this epoch.
+  fraction: 1.0 #Fraction of the dataset to use for training. 1.0 means using the whole dataset.
+  stride: 32 #Stride of the model. Used for calculating the grid size.
+  pad: 0.0 #Padding for the model. 
+  deterministic: True #Deterministic training. 
+  cache: disk #Use cache to speed up training.
+
+  augment: True #Use argument to speed up training
+  mosaic: 1.0 #Use mosaic data augmentation.
+  mixup: 0.0 #Use mixup data augmentation. Not used in this config!
+  degrees: 0.0 #Degree range for random rotations. Not used in this config!
+  translate: 0.1 #Translation for data augmentation. 
+  scale: 0.5 #Scale for data augmentation.
+  shear: 0.0 #Shear intensity (angle in degrees). Not used in this config!
+  perspective: 0.0 #Perspective distortion factor. Not used in this config!
+  copy_paste_mode: 'flip' #Mode for copy-paste augmentation. Not used in this config!
+  copy_paste: 0.0 #Use copy-paste data augmentation. Not used in this config!
+  flipud: 0 #Use up-down flip data augmentation. Not used in this config!
+  fliplr: 0.5 #Use left-right flip data augmentation.
+  mask_ratio: 4 #Mask ratio for data augmentation
+  overlap_mask: True #Use overlap mask for data augmentation
+  bgr: 0.0 #Use BGR instead of RGB
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: train
+    type: MTL_VI_YOLODataset
+    crop_size: 768
+    ir_path: '/data/gyy/M3FD/ir/'
+    vi_path: '/data/gyy/M3FD/vi/'
+    label_path: '/data/gyy/M3FD/labels/'
+    target_size: [1024,768]
+    batch_size_per_gpu: 4
+    num_worker_per_gpu: 8
+    pin_memory: True
+    data_len: -1
+    prefetch_mode: Infinite
+
+  val:
+    # Please modify accordingly to use your own validation
+    # Or comment the val block if do not need validation during training
+    name: val
+    type: MTL_VI_YOLODataset
+    crop_size: 768
+    ir_path: '/data/gyy/M3FD_test_use/ir/'
+    vi_path: '/data/gyy/M3FD_test_use/vi/'
+    label_path: '/data/gyy/M3FD_test_use/labels/'
+    target_size: [1024,768]
+    batch_size_per_gpu: 16
+    num_worker_per_gpu: 8
+    pin_memory: True
+    data_len: -1
+
+Det_labels:
+  nc: 6
+  conf: 0.001
+  iou: 0.7
+  iou_thres: 0.45
+  names: ["People", "Car", "Bus", "Motorcycle", "Lamp", "Truck"] #['ship','car','person']
+  conf_save: 0.25
+
+# network structures
+network_Encoder:
+  type: MTL_Shared_Encoder
+  in_channels: 16
+
+network_Fusion:
+  type: MTL_Fusion_Decoder
+  in_channels: 16
+  out_channel: 1
+
+network_Detection:
+  type: MTL_Detection_Decoder
+  in_channels: 16
+  im_v: 256
+  im_h: 256
+
+path:
+  # pretrain_network_VIFusionYOLO: /home/gyy/IRFusion-main/PTH/VI_M3FD.pth
+  pretrain_network_VIFusionYOLO: ~
+  training_states:
+  strict_load_g: true
+  resume_state: ~
+
+# training settings
+train:
+  alpha: 0.09
+  #n_epoch: 300
+  # optimizer_encoder:
+  #   type: Adam
+  #   lr: !!float 2e-4
+
+  # optimizer_fusion:
+  #   type: Adam
+  #   lr: !!float 2e-4
+
+  # optimizer_detection:
+  #   type: Adam
+  #   lr: !!float 1e-2
+
+  optimizer_encoder:
+    type: SGD
+    lr: !!float 1e-2
+    momentum: 0.9
+    weight_decay: 0.0005
+
+  optimizer_fusion:
+    type: SGD
+    lr: !!float 1e-3
+    momentum: 0.9
+    weight_decay: 0.0005
+
+  optimizer_detection:
+    type: SGD
+    lr: !!float 1e-2
+    momentum: 0.9
+    weight_decay: 0.0005
+
+  scheduler:
+    # type: MultiStepLR
+    # milestones: [50, 100, 200]
+    # gamma: 0.5
+    type: LambdaLR ##num_lambada=len(optimizer)!
+    lrf0: 0.01
+    lrf1: 0.01
+
+  total_iter: 300000
+  warmup_iter: 3000  # -1 no warm up
+
+  #Loss
+  Loss_FD:
+    type: MTL_FusionDetloss_VI
+    device: cuda
+
+val:
+  pbar: true
+  data_dir: '/data/gyy/M3FD_test_use/'
+  name: 'M3FD_test'
+  start_val: 0
+  val_freq: !!float 1000
+  save_img: true
+  save_img_y: false
+  plot_det: false
+  save_txt: false
+ 
+  metrics:
+    EN: 
+      type: ~
+    SF: 
+      type: ~
+    AG: 
+      type: ~
+    SD: 
+      type: ~
+    CC: 
+      type: ~
+    SCD: 
+      type: ~
+    MSE: 
+      type: ~
+      better: lower
+    PSNR: 
+      type: ~
+    Qabf: 
+      type: ~
+    Nabf: 
+      type: ~
+      better: lower
+    mAP50:
+      type: ~
+    mAP50-95:
+      type: ~
+
+
+# logging settings
+logger:
+  print_net: false
+  print_freq: 100
+  only_save_log: true
+  start_save: 0
+  save_checkpoint_freq: !!float 1000
+  only_save_last_best: true
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500
